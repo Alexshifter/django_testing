@@ -1,59 +1,43 @@
 from http import HTTPStatus
 
 from pytest_django.asserts import assertRedirects
+from pytest_lazyfixture import lazy_fixture as lf
 import pytest
+
+
+SUCCESS = HTTPStatus.OK
+FAILURE = HTTPStatus.NOT_FOUND
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url',
+    'url, parametrize_client, exp_status',
     (
-        pytest.lazy_fixture('home_url'),
-        pytest.lazy_fixture('news_detail_url'),
-        pytest.lazy_fixture('users_login_url'),
-        pytest.lazy_fixture('users_logout_url'),
-        pytest.lazy_fixture('users_signup_url'),
+        (lf('home_url'), lf('client'), SUCCESS),
+        (lf('users_login_url'), lf('client'), SUCCESS),
+        (lf('users_logout_url'), lf('client'), SUCCESS),
+        (lf('users_signup_url'), lf('client'), SUCCESS),
+        (lf('news_detail_url'), lf('client'), SUCCESS),
+        (lf('comment_edit_url'), lf('author_client'), SUCCESS),
+        (lf('comment_edit_url'), lf('admin_client'), FAILURE),
+        (lf('comment_delete_url'), lf('author_client'), SUCCESS),
+        (lf('comment_delete_url'), lf('admin_client'), FAILURE),
     ),
 )
-def test_availability_pages_for_anonymous(client, url):
-    response = client.get(url)
-    assert response.status_code == HTTPStatus.OK
-
-
-@pytest.mark.parametrize(
-    'url',
-    (
-        pytest.lazy_fixture('comment_edit_url'),
-        pytest.lazy_fixture('comment_delete_url'),
-
-    )
-)
-@pytest.mark.parametrize(
-    'parametrized_client, exp_status',
-    (
-        (
-            pytest.lazy_fixture('author_client'),
-            HTTPStatus.OK,
-        ),
-        (
-            pytest.lazy_fixture('admin_client'),
-            HTTPStatus.NOT_FOUND),
-    )
-)
-def test_availability_for_comment_edit_and_delete(
+def test_availability_diff_pages_for_diff_users(
     url,
-    parametrized_client,
-    exp_status
+    parametrize_client,
+    exp_status,
 ):
-    response = parametrized_client.get(url)
+    response = parametrize_client.get(url)
     assert response.status_code == exp_status
 
 
 @pytest.mark.parametrize(
     'url',
     (
-        pytest.lazy_fixture('comment_edit_url'),
-        pytest.lazy_fixture('comment_delete_url'),
+        lf('comment_edit_url'),
+        lf('comment_delete_url'),
     )
 )
 def test_redirect_for_anonymous_client(client, url, users_login_url):

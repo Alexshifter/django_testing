@@ -1,24 +1,26 @@
 from django.conf import settings
+
 import pytest
 
+from news.forms import CommentForm
 
-@pytest.mark.django_db
+pytestmark = pytest.mark.django_db
+
+
 def test_news_order(all_news, client, home_url):
     response = client.get(home_url)
-    object_list = response.context['object_list']
-    all_dates = [news.date for news in object_list]
+    all_news_instances = response.context['object_list']
+    all_dates = [news.date for news in all_news_instances]
     sorted_dates = sorted(all_dates, reverse=True)
     assert all_dates == sorted_dates
 
 
-@pytest.mark.django_db
 def test_news_count(all_news, client, home_url):
     response = client.get(home_url)
-    news_count = len(response.context['object_list'])
+    news_count = response.context['object_list'].count()
     assert news_count == settings.NEWS_COUNT_ON_HOME_PAGE
 
 
-@pytest.mark.django_db
 def test_comments_order(
     client,
     some_comments_under_news,
@@ -28,10 +30,11 @@ def test_comments_order(
     response = client.get(news_detail_url)
     assert 'news' in response.context
     all_comments = news.comment_set.all()
-    assert all_comments[0].created < all_comments[1].created
+    all_dates_comments = [comment.created for comment in all_comments]
+    all_dates_comments_sorted = sorted(all_dates_comments)
+    assert all_dates_comments == all_dates_comments_sorted
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     'parametrized_client, comment_form_access_status',
     (
@@ -43,7 +46,15 @@ def test_different_client_has_form(
     news,
     parametrized_client,
     comment_form_access_status,
-    news_detail_url
+    news_detail_url,
 ):
     response = parametrized_client.get(news_detail_url)
     assert ('form' in response.context) is comment_form_access_status
+
+
+def test_form_for_auth_client_has_correct_type(
+        news,
+        author_client,
+        news_detail_url):
+    response = author_client.get(news_detail_url)
+    assert isinstance(response.context['form'], CommentForm)

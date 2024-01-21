@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
 
+import pytest
+
+from django.conf import settings
+from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
-from django.conf import settings
-import pytest
 
 from news.models import News, Comment
 
@@ -14,9 +16,10 @@ def author(django_user_model):
 
 
 @pytest.fixture
-def author_client(author, client):
-    client.force_login(author)
-    return client
+def author_client(author):
+    auth_client = Client()
+    auth_client.force_login(author)
+    return auth_client
 
 
 @pytest.fixture
@@ -45,7 +48,7 @@ def all_news():
             date=today - timedelta(days=index),
         ) for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
     ]
-    return News.objects.bulk_create(all_news)
+    News.objects.bulk_create(all_news)
 
 
 @pytest.fixture
@@ -59,13 +62,6 @@ def some_comments_under_news(author, news):
         )
         comment.created = now + timedelta(days=index)
         comment.save()
-
-
-@pytest.fixture
-def form_data():
-    return {
-        'text': 'Текст комментария, обновленный через форму',
-    }
 
 
 @pytest.fixture
