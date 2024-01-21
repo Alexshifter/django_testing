@@ -1,9 +1,8 @@
 from http import HTTPStatus
 
-from pytest_django.asserts import assertRedirects, assertFormError
 import pytest
-
 from django.contrib.auth import get_user
+from pytest_django.asserts import assertFormError, assertRedirects
 
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
@@ -36,12 +35,13 @@ def test_user_can_create_comment(
 
 
 def test_user_cant_use_bad_words(author_client, news_detail_url):
+    def_num_comments = Comment.objects.count()
     response = author_client.post(
         news_detail_url,
         data={'text': f'{NEW_COMMENT_TEXT}, {BAD_WORDS[0]}!'}
     )
     assertFormError(response, form='form', field='text', errors=WARNING)
-    assert Comment.objects.count() == 0
+    assert Comment.objects.count() == def_num_comments
 
 
 def test_author_can_delete_comment(

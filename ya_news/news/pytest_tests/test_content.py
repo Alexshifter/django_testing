@@ -1,6 +1,5 @@
-from django.conf import settings
-
 import pytest
+from django.conf import settings
 
 from news.forms import CommentForm
 
@@ -40,6 +39,7 @@ def test_comments_order(
     (
         (pytest.lazy_fixture('author_client'), True),
         (pytest.lazy_fixture('client'), False),
+
     )
 )
 def test_different_client_has_form(
@@ -50,11 +50,5 @@ def test_different_client_has_form(
 ):
     response = parametrized_client.get(news_detail_url)
     assert ('form' in response.context) is comment_form_access_status
-
-
-def test_form_for_auth_client_has_correct_type(
-        news,
-        author_client,
-        news_detail_url):
-    response = author_client.get(news_detail_url)
-    assert isinstance(response.context['form'], CommentForm)
+    if comment_form_access_status:
+        assert isinstance(response.context['form'], CommentForm)

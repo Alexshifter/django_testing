@@ -2,48 +2,9 @@ from http import HTTPStatus
 
 from pytils.translit import slugify
 
-from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
-from django.urls import reverse
-
+from .conftest import DataForTestModules
 from notes.forms import WARNING
 from notes.models import Note
-
-User = get_user_model()
-
-
-class DataForTestModules(TestCase):
-
-    NOTE_TEXT = 'Текст заметки, заданный через форму'
-    NOTE_TITLE = 'Заголовок заметки, заданный через форму'
-    NEW_NOTE_TEXT = 'Обновлённый текст заметки'
-    NEW_NOTE_TITLE = 'Обновленный заголовок заметки'
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.author = User.objects.create(username='Автор')
-        cls.notauthor = User.objects.create(username='Не автор')
-        cls.note = Note.objects.create(
-            title='Заголовок заметки',
-            text='Текст заметки',
-            author=cls.author,
-        )
-        cls.author_client = Client()
-        cls.author_client.force_login(cls.author)
-        cls.notauthor_client = Client()
-        cls.notauthor_client.force_login(cls.notauthor)
-        cls.form_data = {
-            'title': cls.NOTE_TITLE,
-            'text': cls.NOTE_TEXT,
-        }
-
-        cls.data_with_notunique_slug = {
-            'slug': cls.note.slug,
-            'text': cls.NOTE_TEXT,
-            'title': cls.NOTE_TITLE,
-        }
-        cls.notes_add_url = reverse('notes:add')
-        cls.notes_success_url = reverse('notes:success')
 
 
 class TestNoteCreation(DataForTestModules):
@@ -84,16 +45,6 @@ class TestNoteCreation(DataForTestModules):
 
 class TestNoteEditDelete(DataForTestModules):
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.form_data = {'title': cls.NEW_NOTE_TITLE,
-                         'text': cls.NEW_NOTE_TEXT,
-                         'slug': slugify(cls.NEW_NOTE_TITLE),
-                         }
-        cls.notes_edit_url = reverse('notes:edit', args=(cls.note.slug,))
-        cls.notes_delete_url = reverse('notes:delete', args=(cls.note.slug,))
-
     def test_author_can_delete_note(self):
         def_notes_count = Note.objects.count()
         response = self.author_client.delete(self.notes_delete_url)
@@ -102,14 +53,14 @@ class TestNoteEditDelete(DataForTestModules):
 
     def test_user_cant_delete_note_of_another_user(self):
         def_notes_count = Note.objects.count()
-        response = self.notauthor_client.delete(self.notes_delete_url)
+        response = self.usr_client.delete(self.notes_delete_url)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(Note.objects.count(), def_notes_count)
 
     def test_author_can_edit_note(self):
         response = self.author_client.post(
             self.notes_edit_url,
-            data=self.form_data,
+            data=self.form_new_data,
         )
         self.assertRedirects(response, self.notes_success_url)
         self.note.refresh_from_db()
@@ -120,13 +71,20 @@ class TestNoteEditDelete(DataForTestModules):
             (self.note.author, self.author),
         )
         for value, setup_value in note_values_setup_values:
-            with self.subTest(value=value, setup_value=setup_value):
+            with self.subTest(
+                value=value,
+                setup_value=setup_value,
+                msg=(
+                    'Убедитесь, что автор заметки '
+                    'может ее редактировать.'
+                )
+            ):
                 self.assertEqual(value, setup_value)
 
     def test_user_cant_edit_note_of_another_user(self):
-        response = self.notauthor_client.post(
+        response = self.usr_client.post(
             self.notes_edit_url,
-            data=self.form_data,
+            data=self.form_new_data,
         )
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         note_from_db = Note.objects.get(id=self.note.id)
@@ -136,5 +94,12 @@ class TestNoteEditDelete(DataForTestModules):
             (note_from_db.author, self.note.author,),
         )
         for value, setup_value in note_values_setup_values:
-            with self.subTest(value=value, setup_value=setup_value):
+            with self.subTest(
+                value=value,
+                setup_value=setup_value,
+                msg=(
+                    'Убедитесь, что пользователь '
+                    'не может редактировать чужие заметки.'
+                )
+            ):
                 self.assertEqual(value, setup_value)
